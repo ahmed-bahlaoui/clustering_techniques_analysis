@@ -13,6 +13,7 @@ dependencies = [
     "polars>=2.1.0",
     "scikit-learn>=1.9.1",
     "scipy>=1.18.1",
+    "umap-learn>=0.5.12",
 ]
 
 [project.scripts]
