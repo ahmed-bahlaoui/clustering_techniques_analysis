@@ -11,7 +11,6 @@ def _():
     import polars as pl
     from pathlib import Path
 
-
     return kagglehub, pl
 
 
@@ -21,7 +20,7 @@ def _(kagglehub, pl):
     # Download latest version
     path = kagglehub.dataset_download("asaniczka/tmdb-movies-dataset-2023-930k-movies")
 
-    # Log dataset path to terminal 
+    # Log dataset path to terminal
     print("Path to dataset files:", path)
 
     datasetname = "TMDB_movie_dataset_v11.csv"
@@ -32,7 +31,7 @@ def _(kagglehub, pl):
 @app.cell
 def _():
     ## Data Preprocessing
-    #Viewing the data
+    # Viewing the data
 
     return
 
