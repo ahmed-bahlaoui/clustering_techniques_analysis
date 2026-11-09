@@ -14,3 +14,6 @@ __marimo__/*
 __pycache__/
 
 data/
+reports/
+
+notebook.py

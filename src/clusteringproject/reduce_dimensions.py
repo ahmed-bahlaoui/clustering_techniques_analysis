@@ -5,9 +5,15 @@ from scipy import sparse
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import MinMaxScaler, normalize
 import umap
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 PROCESSED_DIR = ROOT_DIR / "data" / "processed"
+FIGURES_DIR = ROOT_DIR / "reports" / "figures"
+
 
 
 def load_weighted_matrix(processed_dir: Path = PROCESSED_DIR) -> sparse.csr_matrix:
@@ -72,7 +78,7 @@ def build_umap_canvas_space(
         min_dist=min_dist,
         n_components=2,
         metric="cosine",
-        random_state=random_state,
+        random_state=None,
         low_memory=False,
     )
     coords_2d = reducer.fit_transform(X_pca50).astype(np.float32)
@@ -107,5 +113,110 @@ def run_reduction_pipeline(
     print(f"Saved X_pca50.npy and umap_2d.npy to {PROCESSED_DIR}")
 
 
+def plot_umap_diagnostic(
+    processed_dir: Path = PROCESSED_DIR,
+    output_path: Path = FIGURES_DIR / "01_umap_genre_sanity_check.png",
+) -> None:
+    """
+    Plots the 2D UMAP coordinates colored by each movie's primary genre
+    to verify manifold topology prior to Phase 4 clustering.
+    """
+    umap_2d = np.load(processed_dir / "umap_2d.npy")
+    df = pd.read_parquet(processed_dir / "movies_index.parquet")
+
+    # Extract the first listed genre as the primary genre for coloring
+    df["primary_genre"] = (
+        df["genres"]
+        .fillna("Unknown")
+        .apply(lambda s: s.split(",")[0].strip() if s else "Unknown")
+    )
+
+    # Keep top 10 most frequent primary genres; group the rest as 'Other'
+    top_genres = df["primary_genre"].value_counts().nlargest(10).index.tolist()
+    df["genre_group"] = df["primary_genre"].where(
+        df["primary_genre"].isin(top_genres), "Other"
+    )
+
+    palette = [
+        "#38bdf8", "#f43f5e", "#facc15", "#a855f7", "#4ade80",
+        "#fb923c", "#2dd4bf", "#e879f9", "#60a5fa", "#f87171", "#64748b"
+    ]
+    groups = top_genres + (["Other"] if "Other" in df["genre_group"].values else [])
+
+    fig, ax = plt.subplots(figsize=(12, 8.5), dpi=180)
+    fig.patch.set_facecolor("#0f172a")
+    ax.set_facecolor("#0f172a")
+
+    for idx, genre in enumerate(groups):
+        mask = (df["genre_group"] == genre).to_numpy()
+        color = palette[idx % len(palette)]
+        ax.scatter(
+            umap_2d[mask, 0],
+            umap_2d[mask, 1],
+            s=4.5,
+            c=color,
+            alpha=0.55 if genre != "Other" else 0.25,
+            edgecolors="none",
+            label=f"{genre} ({mask.sum():,})",
+        )
+
+        # Place label at the median coordinate of each top genre
+        if genre != "Other" and mask.sum() > 50:
+            med_x = float(np.median(umap_2d[mask, 0]))
+            med_y = float(np.median(umap_2d[mask, 1]))
+            ax.text(
+                med_x,
+                med_y,
+                genre,
+                color="white",
+                fontsize=9,
+                fontweight="bold",
+                ha="center",
+                va="center",
+                bbox=dict(
+                    boxstyle="round,pad=0.28",
+                    facecolor="#1e293b",
+                    edgecolor=color,
+                    alpha=0.88,
+                    lw=1.1,
+                ),
+            )
+
+    ax.set_title(
+        f"TMDB 2D UMAP Manifold ({len(df):,} Movies Colored by Primary Genre)",
+        color="#f8fafc",
+        fontsize=13,
+        fontweight="bold",
+        pad=14,
+    )
+    ax.set_xlabel("UMAP Dimension 1", color="#94a3b8", fontsize=10)
+    ax.set_ylabel("UMAP Dimension 2", color="#94a3b8", fontsize=10)
+    ax.tick_params(colors="#64748b")
+    for spine in ax.spines.values():
+        spine.set_edgecolor("#334155")
+    ax.grid(True, color="#1e293b", linestyle="--", linewidth=0.6, alpha=0.7)
+
+    leg = ax.legend(
+        loc="upper right",
+        frameon=True,
+        facecolor="#1e293b",
+        edgecolor="#334155",
+        fontsize=8.5,
+        markerscale=3,
+        title="Primary Genre",
+        title_fontsize=9,
+    )
+    leg.get_title().set_color("#f8fafc")
+    for text in leg.get_texts():
+        text.set_color("#e2e8f0")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=180)
+    plt.close(fig)
+    print(f"Saved UMAP diagnostic visualization to {output_path}")
+
+
 if __name__ == "__main__":
     run_reduction_pipeline()
+    plot_umap_diagnostic()
