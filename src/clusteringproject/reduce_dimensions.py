@@ -85,7 +85,7 @@ def build_umap_canvas_space(
 
     # Normalize coordinates to [-1, 1] for canvas rendering
     scaler = MinMaxScaler(feature_range=(-1, 1))
-    coords_normalized = scaler.fit_transform(coords_2d).astype(np.float32)
+    coords_normalized = scaler.fit_transform().astype(np.float32)
 
     print(f"Generated 2D UMAP coordinates of shape {coords_normalized.shape}")
     return coords_normalized
